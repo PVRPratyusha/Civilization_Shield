@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overwatch - Civilization Shield</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --color-bg: rgba(10, 18, 35, 0.95);
+            --color-surface: rgba(15, 28, 50, 0.92);
+            --color-border: rgba(255, 255, 255, 0.1);
+            --color-text: #E8F0F8;
+            --color-text-muted: #8AA0B8;
+            --color-primary: #00AAFF;
+            --color-success: #00D68F;
+            --color-warning: #FFAA00;
+            --color-danger: #FF4D4D;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        /* LOADING SCREEN WITH TYPING ANIMATION */
+        .loader-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a1628 0%, #1a1a2e 50%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+        
+        .loader-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .loader-logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 2rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .loader-logo svg {
+            width: 100%;
+            height: 100%;
+            fill: #0066FF;
+            filter: drop-shadow(0 0 30px rgba(0, 102, 255, 0.6));
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .loader-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: white;
+            min-height: 2.5rem;
+        }
+        
+        .loader-cursor {
+            display: inline-block;
+            width: 3px;
+            height: 1.5rem;
+            background: #0066FF;
+            margin-left: 4px;
+            animation: blink 0.7s infinite;
+            vertical-align: middle;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .loader-status {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 2rem;
+        }
+        
+        .loader-progress {
+            width: 250px;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+        
+        .loader-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #0066FF, #00C6FF);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        /* Floating particles */
+        .particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(0, 102, 255, 0.4);
+            border-radius: 50%;
+            animation: floatUp 10s infinite;
+        }
+        
+        @keyframes floatUp {
+            0% { transform: translateY(100vh); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh); opacity: 0; }
+        }
+        
+        /* MAIN APP */
+        .app-content {
+            display: none;
+        }
+        
+        .app-content.visible {
+            display: block;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            color: var(--color-text);
+            
+            /* VISIBLE BACKGROUND IMAGE - EARTH/GLOBE */
+            background-image: url('background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(5, 12, 25, 0.80);
+            z-index: 0;
+        }
+        
+        .header {
+            background: var(--color-surface);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0 2rem;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: var(--color-text);
+            text-decoration: none;
+        }
+        
+        .logo svg { width: 28px; height: 28px; fill: var(--color-primary); }
+        
+        .header-nav { display: flex; gap: 0.25rem; }
+        
+        .nav-item {
+            color: var(--color-text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.15s;
+        }
+        
+        .nav-item svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .nav-item:hover { color: var(--color-text); background: rgba(0,0,0,0.05); }
+        .nav-item.active { color: var(--color-primary); background: rgba(0, 102, 255, 0.1); }
+        
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.75rem;
+            background: rgba(0,0,0,0.05);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .user-badge svg { width: 16px; height: 16px; stroke: var(--color-text-muted); fill: none; stroke-width: 2; }
+        
+        .logout-btn {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--color-text-muted);
+            cursor: pointer;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.15s;
+        }
+        
+        .logout-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .logout-btn:hover { background: var(--color-danger); border-color: var(--color-danger); color: white; }
+        
+        .main-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .left-column { display: flex; flex-direction: column; gap: 1.5rem; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+        
+        .stat-card {
+            background: var(--color-surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all 0.2s;
+        }
+        
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        
+        .stat-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
+        
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .stat-icon svg { width: 20px; height: 20px; stroke: white; fill: none; stroke-width: 2; }
+        .stat-icon.blue { background: var(--color-primary); }
+        .stat-icon.green { background: var(--color-success); }
+        .stat-icon.orange { background: var(--color-warning); }
+        .stat-icon.red { background: var(--color-danger); }
+        
+        .stat-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        
+        .stat-badge.good { background: rgba(0, 200, 130, 0.25); color: #00D68F; border: 1px solid rgba(0, 200, 130, 0.3); }
+        .stat-badge.warn { background: rgba(255, 170, 0, 0.25); color: #FFBB33; border: 1px solid rgba(255, 170, 0, 0.3); }
+        .stat-badge.bad { background: rgba(255, 77, 77, 0.25); color: #FF6B6B; border: 1px solid rgba(255, 77, 77, 0.3); }
+        
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 0.25rem;
+        }
+        
+        .stat-label { font-size: 0.75rem; color: var(--color-text-muted); font-weight: 500; }
+        
+        .map-section {
+            background: var(--color-surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            overflow: hidden;
+            flex: 1;
+            min-height: 450px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .section-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-title svg { width: 18px; height: 18px; stroke: var(--color-primary); fill: none; stroke-width: 2; }
+        
+        .view-toggle { 
+            display: flex; 
+            gap: 0.25rem; 
+            background: rgba(0, 15, 35, 0.6); 
+            padding: 0.3rem; 
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .view-btn {
+            padding: 0.5rem 0.85rem;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #8AA0B8;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        
+        .view-btn:hover { 
+            color: #FFFFFF; 
+            background: rgba(0, 170, 255, 0.15); 
+        }
+        .view-btn.active { 
+            background: #00AAFF; 
+            color: #FFFFFF; 
+            box-shadow: 0 2px 10px rgba(0, 170, 255, 0.4); 
+        }
+        
+        #map { flex: 1; min-height: 350px; }
+        
+        .right-column { display: flex; flex-direction: column; gap: 1.5rem; }
+        
+        .alert-feed {
+            background: var(--color-surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            overflow: hidden;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-height: 380px;
+        }
+        
+        .feed-content { flex: 1; overflow-y: auto; padding: 0.75rem; }
+        
+        .alert-item {
+            padding: 0.875rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid;
+            transition: all 0.15s;
+        }
+        
+        .alert-item:hover { transform: translateX(4px); }
+        .alert-item.critical { 
+            border-color: #FF4D4D; 
+            background: rgba(180, 40, 40, 0.5); 
+        }
+        .alert-item.warning { 
+            border-color: #FFAA00; 
+            background: rgba(160, 100, 0, 0.45); 
+        }
+        .alert-item.info { 
+            border-color: #00AAFF; 
+            background: rgba(0, 80, 160, 0.4); 
+        }
+        
+        .alert-time {
+            font-size: 0.65rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: #80A0C0;
+            margin-bottom: 0.3rem;
+        }
+        
+        .alert-text { font-size: 0.8rem; line-height: 1.5; color: #E8F0F8; }
+        .alert-text strong { font-weight: 600; color: #FFFFFF; }
+        
+        .alert-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+        
+        .alert-action-btn {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            background: #00AAFF;
+            color: white;
+            transition: all 0.2s;
+        }
+        
+        .alert-action-btn:hover {
+            background: #0088DD;
+            transform: translateY(-1px);
+        }
+        
+        .alert-action-btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #A0B8D0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .alert-action-btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #FFFFFF;
+        }
+        
+        .chatbot-section {
+            background: var(--color-surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 320px;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            background: rgba(5, 12, 25, 0.5);
+        }
+        
+        .chat-message {
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        
+        .chat-message.bot {
+            background: rgba(15, 30, 55, 0.95);
+            color: #E8F0F8;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .chat-message.user {
+            background: var(--color-primary);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .chat-input-area {
+            padding: 0.75rem;
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(8, 16, 30, 0.6);
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 0.6rem 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-family: inherit;
+            background: rgba(10, 20, 40, 0.9);
+            color: #E8F0F8;
+        }
+        
+        .chat-input::placeholder { color: #6080A0; }
+        .chat-input:focus { outline: none; border-color: var(--color-primary); }
+        
+        .chat-send {
+            padding: 0.6rem;
+            background: var(--color-primary);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .chat-send svg { width: 18px; height: 18px; stroke: white; fill: none; stroke-width: 2; }
+        
+        @media (max-width: 1200px) {
+            .main-container { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <!-- LOADING SCREEN WITH TYPING -->
+    <div class="loader-screen" id="loader">
+        <div class="particles">
+            <div class="particle" style="left:10%; animation-delay:0s"></div>
+            <div class="particle" style="left:25%; animation-delay:2s"></div>
+            <div class="particle" style="left:40%; animation-delay:1s"></div>
+            <div class="particle" style="left:55%; animation-delay:3s"></div>
+            <div class="particle" style="left:70%; animation-delay:0.5s"></div>
+            <div class="particle" style="left:85%; animation-delay:2.5s"></div>
+        </div>
+        <div class="loader-logo">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="loader-text"><span id="typed-text"></span><span class="loader-cursor"></span></div>
+        <div class="loader-status" id="loader-status">Initializing...</div>
+        <div class="loader-progress"><div class="loader-bar" id="loader-bar"></div></div>
+    </div>
+    
+    <!-- MAIN APP CONTENT -->
+    <div class="app-content" id="app">
+        <header class="header">
+            <div class="header-content">
+                <a href="overwatch_dashboard.html" class="logo">
+                    <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Civilization Shield
+                </a>
+                <nav class="header-nav">
+                    <a href="overwatch_dashboard.html" class="nav-item active">
+                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="convoy_logistics.html" class="nav-item">
+                        <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                        Logistics
+                    </a>
+                    <a href="supply_management.html" class="nav-item">
+                        <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                        Supplies
+                    </a>
+                </nav>
+                <div class="header-right">
+                    <div class="user-badge">
+                        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span id="user-display">Admin</span>
+                    </div>
+                    <button class="logout-btn" onclick="logout()">
+                        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+        
+        <div class="main-container">
+            <div class="left-column">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon blue"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                            <span class="stat-badge good">Demo</span>
+                        </div>
+                        <div class="stat-value">--</div>
+                        <div class="stat-label">Air Quality Index</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon green"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                            <span class="stat-badge warn">Demo</span>
+                        </div>
+                        <div class="stat-value">--</div>
+                        <div class="stat-label">Hospital Capacity</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon orange"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+                            <span class="stat-badge good">Demo</span>
+                        </div>
+                        <div class="stat-value">--</div>
+                        <div class="stat-label">Supply Status</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon red"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+                            <span class="stat-badge warn">Sample</span>
+                        </div>
+                        <div class="stat-value">3</div>
+                        <div class="stat-label">Sample Alerts</div>
+                    </div>
+                </div>
+                
+                <div class="map-section">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                            Live Crisis Map
+                        </div>
+                        <div class="view-toggle">
+                            <button class="view-btn active">All</button>
+                            <button class="view-btn">Alerts</button>
+                            <button class="view-btn">Resources</button>
+                        </div>
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+            
+            <div class="right-column">
+                <div class="alert-feed">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                            Live Alerts
+                        </div>
+                        <span class="stat-badge bad">3 Active</span>
+                    </div>
+                    <div class="feed-content">
+                        <div class="alert-item critical">
+                            <div class="alert-time">14:23:45 EST • Sample Alert</div>
+                            <div class="alert-text"><strong>Health Report:</strong> Increased pharmacy visits reported in Sector 7. Monitoring situation.</div>
+                            <div class="alert-actions">
+                                <button class="alert-action-btn" onclick="alert('Demo: Would dispatch medical team')">Dispatch Team</button>
+                                <button class="alert-action-btn secondary" onclick="alert('Alert acknowledged')">Acknowledge</button>
+                            </div>
+                        </div>
+                        <div class="alert-item warning">
+                            <div class="alert-time">13:45:12 EST • Sample Alert</div>
+                            <div class="alert-text"><strong>Weather Notice:</strong> Rain expected this evening. Check local weather for updates.</div>
+                            <div class="alert-actions">
+                                <button class="alert-action-btn" onclick="alert('Demo: Would broadcast alert')">Broadcast</button>
+                                <button class="alert-action-btn secondary" onclick="alert('Alert dismissed')">Dismiss</button>
+                            </div>
+                        </div>
+                        <div class="alert-item info">
+                            <div class="alert-time">12:30:08 EST • Sample Alert</div>
+                            <div class="alert-text"><strong>Supply Update:</strong> Delivery to Warehouses 4 & 7 completed.</div>
+                            <div class="alert-actions">
+                                <button class="alert-action-btn secondary" onclick="alert('Logged in system records')">Archive</button>
+                            </div>
+                        </div>
+                        <div class="alert-item warning">
+                            <div class="alert-time">11:15:33 EST • Sample Alert</div>
+                            <div class="alert-text"><strong>Community Report:</strong> Increased flu mentions on social media in Sector 3.</div>
+                            <div class="alert-actions">
+                                <button class="alert-action-btn" onclick="alert('Demo: Would initiate investigation')">Investigate</button>
+                                <button class="alert-action-btn secondary" onclick="alert('Demo: Would escalate to health dept')">Escalate</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chatbot-section">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            Chat Assistant
+                        </div>
+                        <span class="stat-badge good">Online</span>
+                    </div>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-message bot">Hello! I can help you navigate the dashboard. Ask about alerts, resources, or protocols.</div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chat-input" placeholder="Type your question..." onkeypress="if(event.key==='Enter')sendMessage()">
+                        <button class="chat-send" onclick="sendMessage()">
+                            <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Auth check
+        if (localStorage.getItem('isLoggedIn') !== 'true') {
+            window.location.href = 'index.html';
+        }
+        if (localStorage.getItem('userRole') !== 'admin') {
+            window.location.href = 'citizen_shield.html';
+        }
+        
+        document.getElementById('user-display').textContent = localStorage.getItem('username') || 'Admin';
+        
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+        
+        // TYPING ANIMATION
+        const phrases = [
+            'CIVILIZATION SHIELD',
+            'Loading Dashboard...',
+            'Connecting to Services...',
+            'Loading Map Data...',
+            'Syncing Information...',
+            'System Ready.'
+        ];
+        const statuses = [
+            'Establishing connection...',
+            'Loading modules...',
+            'Preparing interface...',
+            'Loading map data...',
+            'Finalizing setup...',
+            'Welcome!'
+        ];
+        
+        let phraseIdx = 0, charIdx = 0, isDeleting = false;
+        const typedEl = document.getElementById('typed-text');
+        const statusEl = document.getElementById('loader-status');
+        const barEl = document.getElementById('loader-bar');
+        
+        function typeEffect() {
+            const phrase = phrases[phraseIdx];
+            
+            if (isDeleting) {
+                typedEl.textContent = phrase.substring(0, charIdx - 1);
+                charIdx--;
+            } else {
+                typedEl.textContent = phrase.substring(0, charIdx + 1);
+                charIdx++;
+            }
+            
+            // Update progress bar
+            const progress = ((phraseIdx / phrases.length) + (charIdx / phrase.length / phrases.length)) * 100;
+            barEl.style.width = Math.min(progress, 100) + '%';
+            
+            let speed = isDeleting ? 30 : 60;
+            
+            if (!isDeleting && charIdx === phrase.length) {
+                speed = 800;
+                isDeleting = true;
+                statusEl.textContent = statuses[phraseIdx];
+            } else if (isDeleting && charIdx === 0) {
+                isDeleting = false;
+                phraseIdx++;
+                
+                if (phraseIdx >= phrases.length) {
+                    barEl.style.width = '100%';
+                    setTimeout(() => {
+                        document.getElementById('loader').classList.add('hidden');
+                        document.getElementById('app').classList.add('visible');
+                        localStorage.removeItem('showLoader');
+                        initMap();
+                    }, 500);
+                    return;
+                }
+                speed = 200;
+            }
+            
+            setTimeout(typeEffect, speed);
+        }
+        
+        // Check if we should show loader
+        if (localStorage.getItem('showLoader') === 'true') {
+            setTimeout(typeEffect, 500);
+        } else {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('app').classList.add('visible');
+            setTimeout(initMap, 100);
+        }
+        
+        // MAP INITIALIZATION with filter functionality
+        let map;
+        let allMarkers = [];
+        let alertMarkers = [];
+        let resourceMarkers = [];
+        
+        function initMap() {
+            map = L.map('map').setView([42.4668, -71.2299], 12);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '©OpenStreetMap, ©CartoDB'
+            }).addTo(map);
+            
+            function icon(color) {
+                return L.divIcon({
+                    className: 'custom-icon',
+                    html: `<div style="background:${color};width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+            }
+            
+            // Resource markers (blue and green)
+            const hospital1 = L.marker([42.4808, -71.2102], {icon: icon('#0066FF')}).bindPopup('<b>General Hospital</b><br>Resource');
+            const hospital2 = L.marker([42.4528, -71.2402], {icon: icon('#0066FF')}).bindPopup('<b>Medical Center</b><br>Resource');
+            const warehouse = L.marker([42.4628, -71.2349], {icon: icon('#00875A')}).bindPopup('<b>Warehouse</b><br>Resource');
+            resourceMarkers = [hospital1, hospital2, warehouse];
+            
+            // Alert markers (red and orange)
+            const alert1 = L.marker([42.4718, -71.2199], {icon: icon('#DE350B')}).bindPopup('<b>Alert Zone</b><br>Critical alert');
+            const alert2 = L.marker([42.4588, -71.2099], {icon: icon('#FF8B00')}).bindPopup('<b>Watch Zone</b><br>Warning alert');
+            alertMarkers = [alert1, alert2];
+            
+            allMarkers = [...resourceMarkers, ...alertMarkers];
+            
+            // Show all by default
+            showMapView('all');
+        }
+        
+        function showMapView(view) {
+            // Remove all markers
+            allMarkers.forEach(m => map.removeLayer(m));
+            
+            // Add markers based on view
+            if (view === 'all') {
+                allMarkers.forEach(m => m.addTo(map));
+            } else if (view === 'alerts') {
+                alertMarkers.forEach(m => m.addTo(map));
+            } else if (view === 'resources') {
+                resourceMarkers.forEach(m => m.addTo(map));
+            }
+        }
+        
+        // Setup view toggle buttons
+        document.querySelectorAll('.view-toggle .view-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Update active state
+                this.parentElement.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Get view type
+                const view = this.textContent.toLowerCase();
+                showMapView(view);
+            });
+        });
+        
+        // CHATBOT with Text-to-Speech
+        const responses = {
+            alert: 'There are 3 active alerts displayed on the dashboard. Check the Live Alerts panel for details.',
+            resource: 'Resource status is shown in the stats cards above. Check individual warehouses for detailed inventory.',
+            protocol: 'Emergency protocols are available in the system documentation. Contact your supervisor for specific procedures.',
+            weather: 'Current weather information is displayed in alerts. Check local weather services for detailed forecasts.',
+            default: 'I can help navigate the dashboard. Ask about alerts, resources, protocols, or weather updates.'
+        };
+        
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+                const voices = window.speechSynthesis.getVoices();
+                const preferredVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Microsoft'));
+                if (preferredVoice) utterance.voice = preferredVoice;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+        
+        // Initial greeting with voice
+        window.speechSynthesis.onvoiceschanged = () => {
+            setTimeout(() => speak('Hello! I can help you navigate the dashboard. Ask about alerts, resources, or protocols.'), 1000);
+        };
+        
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+            
+            const chat = document.getElementById('chat-messages');
+            chat.innerHTML += `<div class="chat-message user">${msg}</div>`;
+            input.value = '';
+            
+            setTimeout(() => {
+                let reply = responses.default;
+                const lower = msg.toLowerCase();
+                for (const [k, v] of Object.entries(responses)) {
+                    if (lower.includes(k)) { reply = v; break; }
+                }
+                chat.innerHTML += `<div class="chat-message bot">${reply}</div>`;
+                chat.scrollTop = chat.scrollHeight;
+                speak(reply);
+            }, 500);
+        }
+        
+        // View toggle functionality
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.parentElement.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

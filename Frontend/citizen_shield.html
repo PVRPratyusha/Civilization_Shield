@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citizen Portal - Civilization Shield</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --color-surface: rgba(15, 28, 50, 0.92);
+            --color-border: rgba(255, 255, 255, 0.1);
+            --color-text: #E8F0F8;
+            --color-text-muted: #8AA0B8;
+            --color-primary: #00AAFF;
+            --color-success: #00D68F;
+            --color-warning: #FFAA00;
+            --color-danger: #FF4D4D;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        /* LOADER */
+        .loader-screen {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(135deg, #0a1628, #1a1a2e, #16213e);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+        .loader-screen.hidden { opacity: 0; visibility: hidden; }
+        
+        .loader-logo { width: 80px; height: 80px; margin-bottom: 2rem; animation: pulse 2s infinite; }
+        .loader-logo svg { width: 100%; height: 100%; fill: #00875A; filter: drop-shadow(0 0 30px rgba(0, 135, 90, 0.6)); }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        
+        .loader-text { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 600; color: white; min-height: 2rem; }
+        .loader-cursor { display: inline-block; width: 3px; height: 1.4rem; background: #00875A; margin-left: 4px; animation: blink 0.7s infinite; vertical-align: middle; }
+        @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+        
+        .loader-status { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 2rem; }
+        .loader-progress { width: 220px; height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 1rem; overflow: hidden; }
+        .loader-bar { height: 100%; background: linear-gradient(90deg, #00875A, #00C6A0); width: 0%; transition: width 0.3s; }
+        
+        .particles { position: absolute; width: 100%; height: 100%; overflow: hidden; }
+        .particle { position: absolute; width: 4px; height: 4px; background: rgba(0, 135, 90, 0.4); border-radius: 50%; animation: floatUp 12s infinite; }
+        @keyframes floatUp { 0% { transform: translateY(100vh); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-100vh); opacity: 0; } }
+        
+        /* APP */
+        .app-content { display: none; }
+        .app-content.visible { display: block; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            color: var(--color-text);
+            /* VISIBLE NATURE BACKGROUND */
+            background-image: url('background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(5, 12, 25, 0.80);
+            z-index: 0;
+        }
+        
+        .header {
+            background: var(--color-surface);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0 2rem;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content { max-width: 1200px; width: 100%; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 0.75rem; font-size: 1.125rem; font-weight: 700; color: var(--color-text); text-decoration: none; }
+        .logo svg { width: 28px; height: 28px; fill: var(--color-success); }
+        
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .user-badge { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: #E3FCEF; border-radius: 6px; font-size: 0.8rem; font-weight: 500; color: var(--color-success); }
+        .user-badge svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+        
+        .logout-btn { padding: 0.5rem 1rem; background: transparent; border: 1px solid var(--color-border); border-radius: 6px; font-size: 0.8rem; color: var(--color-text-muted); cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 0.4rem; }
+        .logout-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .logout-btn:hover { background: var(--color-danger); border-color: var(--color-danger); color: white; }
+        
+        .main-container { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; position: relative; z-index: 1; }
+        
+        .welcome-banner {
+            background: linear-gradient(135deg, rgba(0, 80, 60, 0.85), rgba(0, 100, 80, 0.75));
+            border: 1px solid rgba(0, 200, 150, 0.3);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .welcome-content h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; color: #FFFFFF; }
+        .welcome-content p { font-size: 0.95rem; color: #A0D0C0; }
+        
+        .safety-score { text-align: center; padding: 1rem 2rem; background: rgba(10, 25, 40, 0.9); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 1px solid rgba(0, 200, 150, 0.3); }
+        .score-value { font-size: 3rem; font-weight: 700; color: #00D68F; font-family: 'JetBrains Mono', monospace; }
+        .score-label { font-size: 0.75rem; color: #80C0A0; text-transform: uppercase; font-weight: 600; }
+        
+        .content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        
+        .card {
+            background: var(--color-surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+        .card-title svg { width: 18px; height: 18px; stroke: var(--color-primary); fill: none; stroke-width: 2; }
+        .card-body { padding: 1.25rem; }
+        
+        .risk-grid { display: grid; gap: 1rem; }
+        .risk-item { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: rgba(8, 18, 35, 0.8); border-radius: 8px; border-left: 3px solid; }
+        .risk-item.low { border-color: #00D68F; }
+        .risk-item.medium { border-color: #FFAA00; }
+        
+        .risk-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        .risk-icon.low { background: rgba(0, 214, 143, 0.2); }
+        .risk-icon.medium { background: rgba(255, 170, 0, 0.2); }
+        .risk-icon svg { width: 20px; height: 20px; stroke-width: 2; fill: none; }
+        .risk-icon.low svg { stroke: #00D68F; }
+        .risk-icon.medium svg { stroke: #FFAA00; }
+        
+        .risk-content { flex: 1; }
+        .risk-title { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.2rem; color: #E8F0F8; }
+        .risk-desc { font-size: 0.75rem; color: #8AA0B8; }
+        
+        .risk-badge { font-size: 0.65rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 4px; text-transform: uppercase; }
+        .risk-badge.low { background: rgba(0, 214, 143, 0.2); color: #00D68F; }
+        .risk-badge.medium { background: rgba(255, 170, 0, 0.2); color: #FFAA00; }
+        
+        .alert-list { max-height: 250px; overflow-y: auto; }
+        .alert-item { padding: 0.875rem; border-radius: 8px; margin-bottom: 0.75rem; border-left: 3px solid; }
+        .alert-item.info { border-color: var(--color-primary); background: rgba(0, 170, 255, 0.15); }
+        .alert-item.warning { border-color: var(--color-warning); background: rgba(255, 170, 0, 0.15); }
+        .alert-time { font-size: 0.65rem; font-family: 'JetBrains Mono', monospace; color: #A0B8D0; margin-bottom: 0.25rem; }
+        .alert-text { font-size: 0.8rem; line-height: 1.5; color: #E8F0F8; }
+        
+        #citizen-map { height: 220px; border-radius: 8px; margin-top: 1rem; }
+        
+        .chatbot-card { grid-column: 1 / -1; }
+        .chat-messages { height: 180px; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; background: rgba(10, 20, 40, 0.5); border-radius: 8px; }
+        .chat-message { max-width: 80%; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.85rem; line-height: 1.5; }
+        .chat-message.bot { background: rgba(15, 30, 50, 0.9); color: #E8F0F8; align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .chat-message.user { background: var(--color-primary); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .chat-input-area { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        .chat-input { flex: 1; padding: 0.75rem 1rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.875rem; font-family: inherit; background: rgba(10, 20, 40, 0.8); color: #E8F0F8; }
+        .chat-input::placeholder { color: #6080A0; }
+        .chat-input:focus { outline: none; border-color: var(--color-primary); }
+        .chat-send { padding: 0.75rem; background: var(--color-success); border: none; border-radius: 8px; cursor: pointer; }
+        .chat-send svg { width: 18px; height: 18px; stroke: white; fill: none; stroke-width: 2; }
+        
+        .voice-btn {
+            padding: 0.75rem;
+            background: rgba(10, 25, 45, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .voice-btn svg { width: 18px; height: 18px; stroke: #8AA0B8; fill: none; stroke-width: 2; }
+        .voice-btn:hover { background: rgba(0, 170, 255, 0.2); border-color: #00AAFF; }
+        .voice-btn:hover svg { stroke: #00AAFF; }
+        .voice-btn.recording { background: rgba(255, 60, 60, 0.3); border-color: #FF4D4D; animation: pulse-recording 1s infinite; }
+        .voice-btn.recording svg { stroke: #FF4D4D; }
+        
+        @keyframes pulse-recording {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(255, 77, 77, 0); }
+        }
+        
+        .emergency-section {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, rgba(180, 50, 30, 0.6), rgba(140, 40, 25, 0.5));
+            border: 1px solid rgba(255, 100, 80, 0.4);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .emergency-info h3 { font-size: 1rem; font-weight: 600; color: #FF8080; margin-bottom: 0.25rem; }
+        .emergency-info p { font-size: 0.85rem; color: #C0A0A0; }
+        .emergency-btn { padding: 1rem 2rem; background: var(--color-danger); border: none; border-radius: 8px; color: white; font-size: 0.95rem; font-weight: 600; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 0.5rem; }
+        .emergency-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .emergency-btn:hover { transform: scale(1.02); box-shadow: 0 4px 15px rgba(222,53,11,0.3); }
+        
+        @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } .welcome-banner { flex-direction: column; gap: 1.5rem; text-align: center; } }
+    </style>
+</head>
+<body>
+    <!-- LOADER -->
+    <div class="loader-screen" id="loader">
+        <div class="particles">
+            <div class="particle" style="left:15%; animation-delay:0s"></div>
+            <div class="particle" style="left:35%; animation-delay:2s"></div>
+            <div class="particle" style="left:55%; animation-delay:1s"></div>
+            <div class="particle" style="left:75%; animation-delay:3s"></div>
+            <div class="particle" style="left:90%; animation-delay:1.5s"></div>
+        </div>
+        <div class="loader-logo"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <div class="loader-text"><span id="typed-text"></span><span class="loader-cursor"></span></div>
+        <div class="loader-status" id="loader-status">Connecting...</div>
+        <div class="loader-progress"><div class="loader-bar" id="loader-bar"></div></div>
+    </div>
+    
+    <!-- APP -->
+    <div class="app-content" id="app">
+        <header class="header">
+            <div class="header-content">
+                <a href="citizen_shield.html" class="logo">
+                    <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Citizen Shield
+                </a>
+                <div class="header-right">
+                    <div class="user-badge">
+                        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Protected
+                    </div>
+                    <button class="logout-btn" onclick="logout()">
+                        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+        
+        <div class="main-container">
+            <div class="welcome-banner">
+                <div class="welcome-content">
+                    <h1>Welcome back, <span id="user-name">Citizen</span></h1>
+                    <p>Your community is at normal safety levels. Stay informed and prepared.</p>
+                </div>
+                <div class="safety-score">
+                    <div class="score-value" style="font-size:1.5rem;">✓</div>
+                    <div class="score-label">Status: Normal</div>
+                </div>
+            </div>
+            
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Local Information</div>
+                    </div>
+                    <div class="card-body">
+                        <div class="risk-grid">
+                            <div class="risk-item low">
+                                <div class="risk-icon low"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+                                <div class="risk-content"><div class="risk-title">Flood Zone Status</div><div class="risk-desc">Check FEMA flood maps for your area</div></div>
+                                <span class="risk-badge low">Info</span>
+                            </div>
+                            <div class="risk-item medium">
+                                <div class="risk-icon medium"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                                <div class="risk-content"><div class="risk-title">Air Quality</div><div class="risk-desc">Check AirNow.gov for current readings</div></div>
+                                <span class="risk-badge medium">Check</span>
+                            </div>
+                            <div class="risk-item low">
+                                <div class="risk-icon low"><svg viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></div>
+                                <div class="risk-content"><div class="risk-title">Health Alerts</div><div class="risk-desc">Check local health department for updates</div></div>
+                                <span class="risk-badge low">Info</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Community Alerts</div>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert-list">
+                            <div class="alert-item info"><div class="alert-time">Today, 2:30 PM</div><div class="alert-text">Weather advisory: Light rain this evening. No significant impact.</div></div>
+                            <div class="alert-item warning"><div class="alert-time">Today, 11:15 AM</div><div class="alert-text">Health notice: Flu activity in nearby schools. Consider precautions.</div></div>
+                            <div class="alert-item info"><div class="alert-time">Yesterday</div><div class="alert-text">Supply update: Emergency food fully stocked at distribution center.</div></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>Nearby Resources</div></div>
+                    <div class="card-body">
+                        <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:0.5rem">Hospitals, shelters, and services near you</p>
+                        <div id="citizen-map"></div>
+                    </div>
+                </div>
+                
+                <div class="card chatbot-card">
+                    <div class="card-header">
+                        <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Safety Assistant</div>
+                        <span style="font-size:0.7rem;background:rgba(0,214,143,0.2);color:#00D68F;padding:0.2rem 0.5rem;border-radius:4px;font-weight:600;border:1px solid rgba(0,214,143,0.3)">Online</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="chat-messages" id="chat-messages">
+                            <div class="chat-message bot">Hi! I'm your Safety Assistant. Ask me about emergency preparedness, local resources, or safety tips. You can type or use the microphone to speak.</div>
+                        </div>
+                        <div class="chat-input-area">
+                            <button class="voice-btn" id="voice-btn" onclick="toggleVoiceRecording()">
+                                <svg viewBox="0 0 24 24" id="mic-icon"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                            </button>
+                            <input type="text" class="chat-input" id="chat-input" placeholder="Ask about safety or tap mic to speak..." onkeypress="if(event.key==='Enter')sendMessage()">
+                            <button class="chat-send" onclick="sendMessage()"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="emergency-section">
+                    <div class="emergency-info"><h3>Need Immediate Help?</h3><p>Contact emergency services or report a crisis</p></div>
+                    <button class="emergency-btn" onclick="alert('Connecting to emergency services...')">
+                        <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        Emergency Call
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        if (localStorage.getItem('isLoggedIn') !== 'true') window.location.href = 'index.html';
+        
+        const username = localStorage.getItem('username') || 'Citizen';
+        document.getElementById('user-name').textContent = username.charAt(0).toUpperCase() + username.slice(1);
+        
+        function logout() { localStorage.clear(); window.location.href = 'index.html'; }
+        
+        // TYPING ANIMATION
+        const phrases = ['CIVILIZATION SHIELD', 'Securing Your Safety...', 'Loading Local Data...', 'Analyzing Risks...', 'Protection Active.'];
+        const statuses = ['Connecting to safety network...', 'Fetching local emergency data...', 'Analyzing your area risks...', 'Syncing with emergency services...', 'Welcome! You are protected.'];
+        
+        let phraseIdx = 0, charIdx = 0, isDeleting = false;
+        const typedEl = document.getElementById('typed-text');
+        const statusEl = document.getElementById('loader-status');
+        const barEl = document.getElementById('loader-bar');
+        
+        function typeEffect() {
+            const phrase = phrases[phraseIdx];
+            if (isDeleting) { typedEl.textContent = phrase.substring(0, charIdx - 1); charIdx--; }
+            else { typedEl.textContent = phrase.substring(0, charIdx + 1); charIdx++; }
+            
+            barEl.style.width = Math.min(((phraseIdx / phrases.length) + (charIdx / phrase.length / phrases.length)) * 100, 100) + '%';
+            
+            let speed = isDeleting ? 30 : 60;
+            if (!isDeleting && charIdx === phrase.length) { speed = 800; isDeleting = true; statusEl.textContent = statuses[phraseIdx]; }
+            else if (isDeleting && charIdx === 0) {
+                isDeleting = false; phraseIdx++;
+                if (phraseIdx >= phrases.length) {
+                    barEl.style.width = '100%';
+                    setTimeout(() => {
+                        document.getElementById('loader').classList.add('hidden');
+                        document.getElementById('app').classList.add('visible');
+                        localStorage.removeItem('showLoader');
+                        initMap();
+                    }, 500);
+                    return;
+                }
+                speed = 200;
+            }
+            setTimeout(typeEffect, speed);
+        }
+        
+        if (localStorage.getItem('showLoader') === 'true') { setTimeout(typeEffect, 500); }
+        else { document.getElementById('loader').style.display = 'none'; document.getElementById('app').classList.add('visible'); setTimeout(initMap, 100); }
+        
+        // MAP
+        function initMap() {
+            const map = L.map('citizen-map').setView([42.4668, -71.2299], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '©OSM' }).addTo(map);
+            
+            function icon(c) { return L.divIcon({ className: '', html: `<div style="background:${c};width:18px;height:18px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.2)"></div>`, iconSize: [18,18], iconAnchor: [9,9] }); }
+            
+            L.marker([42.4808, -71.2102], {icon: icon('#0066FF')}).bindPopup('<b>Hospital</b><br>Sample location').addTo(map);
+            L.marker([42.4628, -71.2349], {icon: icon('#00875A')}).bindPopup('<b>Emergency Shelter</b><br>Sample location').addTo(map);
+            L.marker([42.4718, -71.2099], {icon: icon('#FF8B00')}).bindPopup('<b>Fire Station</b><br>Sample location').addTo(map);
+            L.marker([42.4668, -71.2299], {icon: icon('#DE350B')}).bindPopup('<b>Demo Location</b>').addTo(map);
+        }
+        
+        // CHAT with Text-to-Speech and Voice Recognition
+        const responses = {
+            emergency: 'For emergencies, always call 911. For non-emergencies, contact your local emergency management office.',
+            shelter: 'Find emergency shelters through your local Red Cross chapter or emergency management agency.',
+            hospital: 'Find nearby hospitals using Google Maps or your local health department website.',
+            kit: 'Emergency kit essentials: 3 days of water, non-perishable food, flashlight, first aid kit, radio, batteries, medications, and important documents.',
+            weather: 'Check your local weather service or weather.gov for current forecasts and alerts.',
+            flood: 'Check FEMA flood maps at msc.fema.gov to understand flood risk in your area.',
+            fire: 'Find your nearest fire station through your local fire department website or Google Maps.',
+            evacuation: 'Contact your local emergency management office for official evacuation routes in your area.',
+            water: 'Check your local water utility website for water quality reports and any advisories.',
+            power: 'Report power outages to your local utility company. Check their website for outage maps.',
+            help: 'I can provide general guidance on: emergencies, shelters, hospitals, emergency kits, weather, flood info, fire stations, evacuation, water safety, and power outages.',
+            default: 'I can help with general emergency preparedness information. Say "help" to see all topics. For specific local information, please contact your local emergency services.'
+        };
+        
+        let isRecording = false;
+        let recognition = null;
+        
+        // Initialize Speech Recognition
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+            
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('chat-input').value = transcript;
+                stopRecording();
+                sendMessage();
+            };
+            
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                stopRecording();
+                if (event.error === 'not-allowed') {
+                    alert('Microphone access denied. Please allow microphone access to use voice input.');
+                }
+            };
+            
+            recognition.onend = () => {
+                stopRecording();
+            };
+        }
+        
+        function toggleVoiceRecording() {
+            if (!recognition) {
+                alert('Voice recognition is not supported in your browser. Please use Chrome or Edge.');
+                return;
+            }
+            
+            if (isRecording) {
+                recognition.stop();
+                stopRecording();
+            } else {
+                startRecording();
+                recognition.start();
+            }
+        }
+        
+        function startRecording() {
+            isRecording = true;
+            document.getElementById('voice-btn').classList.add('recording');
+            document.getElementById('chat-input').placeholder = 'Listening...';
+        }
+        
+        function stopRecording() {
+            isRecording = false;
+            document.getElementById('voice-btn').classList.remove('recording');
+            document.getElementById('chat-input').placeholder = 'Ask about safety or tap mic to speak...';
+        }
+        
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+                const voices = window.speechSynthesis.getVoices();
+                const preferredVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Microsoft'));
+                if (preferredVoice) utterance.voice = preferredVoice;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+        
+        // Initial greeting with voice
+        window.speechSynthesis.onvoiceschanged = () => {
+            setTimeout(() => speak('Hi! I am your Safety Assistant. You can type or use the microphone to speak with me.'), 1000);
+        };
+        
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+            
+            const chat = document.getElementById('chat-messages');
+            chat.innerHTML += `<div class="chat-message user">${msg}</div>`;
+            input.value = '';
+            
+            setTimeout(() => {
+                let reply = responses.default;
+                const lower = msg.toLowerCase();
+                for (const [k, v] of Object.entries(responses)) { if (lower.includes(k)) { reply = v; break; } }
+                chat.innerHTML += `<div class="chat-message bot">${reply}</div>`;
+                chat.scrollTop = chat.scrollHeight;
+                speak(reply);
+            }, 500);
+        }
+    </script>
+</body>
+</html>

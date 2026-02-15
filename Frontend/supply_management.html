@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supply Management - Civilization Shield</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: rgba(10, 18, 35, 0.95);
+            --color-surface: rgba(15, 28, 50, 0.92);
+            --color-border: rgba(255, 255, 255, 0.1);
+            --color-text: #E8F0F8;
+            --color-text-muted: #8AA0B8;
+            --color-primary: #00AAFF;
+            --color-success: #00D68F;
+            --color-warning: #FFAA00;
+            --color-danger: #FF4D4D;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--color-text);
+            min-height: 100vh;
+            background-color: #0a1225;
+            background-image: url('background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(5, 12, 25, 0.88);
+            z-index: 0;
+        }
+        
+        .header {
+            background: var(--color-surface);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0 2rem;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+        
+        .logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1rem; color: var(--color-text); text-decoration: none; }
+        .logo svg { width: 24px; height: 24px; fill: var(--color-primary); }
+        
+        .header-nav { display: flex; gap: 0.25rem; }
+        .nav-item { color: var(--color-text-muted); text-decoration: none; font-size: 0.8rem; font-weight: 500; padding: 0.5rem 0.875rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
+        .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .nav-item:hover { color: var(--color-text); background: rgba(255,255,255,0.05); }
+        .nav-item.active { color: var(--color-primary); background: rgba(0, 170, 255, 0.15); }
+        
+        .logout-btn { padding: 0.5rem 0.875rem; background: transparent; border: 1px solid var(--color-border); border-radius: 6px; font-size: 0.8rem; color: var(--color-text-muted); cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 0.4rem; transition: all 0.2s; }
+        .logout-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .logout-btn:hover { background: var(--color-danger); border-color: var(--color-danger); color: white; }
+        
+        .page-header { max-width: 1400px; margin: 0 auto; padding: 2rem 2rem 1rem; position: relative; z-index: 1; }
+        .page-title { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .page-subtitle { font-size: 0.95rem; color: var(--color-text-muted); }
+        
+        .main-container { max-width: 1400px; margin: 0 auto; padding: 0 2rem 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; position: relative; z-index: 1; }
+        
+        .card { background: var(--color-surface); backdrop-filter: blur(15px); border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; }
+        .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 0.6rem; }
+        .card-title svg { width: 20px; height: 20px; stroke: var(--color-primary); fill: none; stroke-width: 2; }
+        .card-body { padding: 1.25rem; }
+        .full-width { grid-column: 1 / -1; }
+        
+        .source-citation { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: rgba(0, 170, 255, 0.08); border-left: 3px solid var(--color-primary); border-radius: 0 6px 6px 0; margin-bottom: 1rem; font-size: 0.75rem; color: var(--color-text-muted); }
+        .source-citation a { color: var(--color-primary); text-decoration: none; }
+        .source-citation a:hover { text-decoration: underline; }
+        
+        .inventory-table { width: 100%; border-collapse: collapse; }
+        .inventory-table th, .inventory-table td { padding: 1rem 1.25rem; text-align: left; border-bottom: 1px solid var(--color-border); }
+        .inventory-table th { font-size: 0.7rem; font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .inventory-table td { font-size: 0.875rem; }
+        .inventory-table tr:last-child td { border-bottom: none; }
+        .inventory-table tbody tr { transition: background 0.2s; }
+        .inventory-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+        
+        .item-name { display: flex; align-items: center; gap: 0.875rem; }
+        .item-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+        .item-icon svg { width: 20px; height: 20px; stroke-width: 1.5; fill: none; }
+        
+        .item-icon.grain { background: linear-gradient(135deg, rgba(255, 180, 100, 0.2), rgba(255, 150, 50, 0.1)); }
+        .item-icon.grain svg { stroke: #FFB464; }
+        .item-icon.water { background: linear-gradient(135deg, rgba(100, 180, 255, 0.2), rgba(50, 150, 255, 0.1)); }
+        .item-icon.water svg { stroke: #64B4FF; }
+        .item-icon.medical { background: linear-gradient(135deg, rgba(255, 100, 100, 0.2), rgba(255, 50, 50, 0.1)); }
+        .item-icon.medical svg { stroke: #FF6464; }
+        .item-icon.protein { background: linear-gradient(135deg, rgba(200, 150, 100, 0.2), rgba(180, 120, 80, 0.1)); }
+        .item-icon.protein svg { stroke: #C89664; }
+        .item-icon.vegetable { background: linear-gradient(135deg, rgba(100, 200, 130, 0.2), rgba(50, 180, 100, 0.1)); }
+        .item-icon.vegetable svg { stroke: #64C882; }
+        
+        .item-details { display: flex; flex-direction: column; gap: 0.15rem; }
+        .item-title { font-weight: 600; color: var(--color-text); }
+        .item-desc { font-size: 0.75rem; color: var(--color-text-muted); }
+        .calc-basis { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--color-primary); }
+        
+        .crop-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .crop-card { background: rgba(8, 18, 38, 0.7); border: 1px solid var(--color-border); border-radius: 10px; padding: 1.25rem; transition: all 0.2s; }
+        .crop-card:hover { border-color: rgba(0, 170, 255, 0.4); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2); }
+        
+        .crop-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+        .crop-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(0, 214, 143, 0.2), rgba(0, 180, 120, 0.1)); }
+        .crop-icon svg { width: 24px; height: 24px; stroke: #00D68F; fill: none; stroke-width: 1.5; }
+        
+        .crop-info { flex: 1; }
+        .crop-name { font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; }
+        .crop-time { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--color-success); font-weight: 500; }
+        .crop-time svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .crop-details { font-size: 0.8rem; color: var(--color-text-muted); line-height: 1.6; margin-bottom: 0.75rem; }
+        .crop-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+        .crop-tag { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; background: rgba(0, 170, 255, 0.1); border: 1px solid rgba(0, 170, 255, 0.2); color: #00AAFF; border-radius: 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+        
+        .calculator-form { display: grid; gap: 1.25rem; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+        .form-label { font-size: 0.8rem; font-weight: 500; color: var(--color-text-muted); }
+        .form-input { padding: 0.875rem 1rem; background: rgba(8, 18, 38, 0.8); border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text); font-size: 1rem; font-family: 'JetBrains Mono', monospace; transition: all 0.2s; }
+        .form-input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0, 170, 255, 0.1); }
+        .form-input::placeholder { color: #5A7090; }
+        
+        .calculate-btn { padding: 1rem 1.5rem; background: linear-gradient(135deg, #00AAFF, #0088DD); border: none; border-radius: 8px; color: white; font-weight: 600; font-size: 0.9rem; cursor: pointer; font-family: inherit; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+        .calculate-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .calculate-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 170, 255, 0.3); }
+        
+        .result-box { margin-top: 1.25rem; padding: 1.25rem; background: rgba(0, 170, 255, 0.08); border: 1px solid rgba(0, 170, 255, 0.2); border-radius: 10px; display: none; }
+        .result-box.visible { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .result-title { font-size: 0.75rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1rem; }
+        .result-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .result-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(0, 0, 0, 0.2); border-radius: 8px; }
+        .result-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        .result-icon svg { width: 16px; height: 16px; stroke-width: 2; fill: none; }
+        .result-value { font-size: 1.1rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .result-label { font-size: 0.7rem; color: var(--color-text-muted); }
+        .result-note { font-size: 0.7rem; color: var(--color-text-muted); margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); font-style: italic; }
+        
+        .resource-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.875rem; }
+        .resource-link { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; background: rgba(8, 18, 38, 0.7); border: 1px solid var(--color-border); border-radius: 10px; text-decoration: none; color: var(--color-text); transition: all 0.2s; }
+        .resource-link:hover { border-color: var(--color-primary); background: rgba(0, 170, 255, 0.08); transform: translateX(4px); }
+        .resource-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: rgba(0, 170, 255, 0.1); }
+        .resource-icon svg { width: 20px; height: 20px; stroke: var(--color-primary); fill: none; stroke-width: 1.5; }
+        .resource-info { flex: 1; }
+        .resource-title { font-weight: 600; font-size: 0.875rem; margin-bottom: 0.2rem; }
+        .resource-desc { font-size: 0.7rem; color: var(--color-text-muted); }
+        .resource-arrow { color: var(--color-text-muted); transition: all 0.2s; }
+        .resource-link:hover .resource-arrow { color: var(--color-primary); transform: translateX(4px); }
+        
+        .disclaimer { grid-column: 1 / -1; display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.2); border-radius: 10px; font-size: 0.8rem; color: #D4A050; }
+        .disclaimer-icon { width: 36px; height: 36px; border-radius: 8px; background: rgba(255, 170, 0, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .disclaimer-icon svg { width: 20px; height: 20px; stroke: #FFAA00; fill: none; stroke-width: 2; }
+        
+        @media (max-width: 900px) {
+            .main-container { grid-template-columns: 1fr; }
+            .crop-grid { grid-template-columns: 1fr; }
+            .resource-grid { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            .result-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="overwatch_dashboard.html" class="logo">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Civilization Shield
+            </a>
+            <nav class="header-nav">
+                <a href="overwatch_dashboard.html" class="nav-item"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a>
+                <a href="convoy_logistics.html" class="nav-item"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Logistics</a>
+                <a href="supply_management.html" class="nav-item active"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Supplies</a>
+            </nav>
+            <button class="logout-btn" onclick="logout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button>
+        </div>
+    </header>
+    
+    <div class="page-header">
+        <h1 class="page-title">Food & Supply Management</h1>
+        <p class="page-subtitle">Emergency preparedness guidelines based on official recommendations</p>
+    </div>
+    
+    <div class="main-container">
+        <div class="disclaimer">
+            <div class="disclaimer-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <div><strong>Demo Interface</strong> — Guidelines based on FEMA recommendations. For actual emergency assistance, contact your local emergency management agency or visit <a href="https://www.ready.gov" target="_blank" style="color:#FFAA00;">Ready.gov</a></div>
+        </div>
+        
+        <!-- Inventory Guidelines -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>Emergency Supply Guidelines</div>
+            </div>
+            <div class="card-body" style="padding:0;">
+                <div class="source-citation" style="margin:1rem 1rem 0;">
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--color-primary);fill:none;stroke-width:2;flex-shrink:0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Source: <a href="https://www.ready.gov/kit" target="_blank">FEMA Ready.gov Emergency Supply List</a>
+                </div>
+                <table class="inventory-table">
+                    <thead><tr><th>Supply Item</th><th>Recommended Amount</th><th>Why This Amount?</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><div class="item-name"><div class="item-icon water"><svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg></div><div class="item-details"><div class="item-title">Drinking Water</div><div class="item-desc">For drinking and sanitation</div></div></div></td>
+                            <td><span class="calc-basis">1 gallon</span> per person/day</td>
+                            <td>FEMA minimum: ½ gal drinking + ½ gal sanitation</td>
+                        </tr>
+                        <tr>
+                            <td><div class="item-name"><div class="item-icon grain"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div><div class="item-details"><div class="item-title">Grains & Cereals</div><div class="item-desc">Rice, pasta, oats, flour</div></div></div></td>
+                            <td><span class="calc-basis">2 lbs</span> per person/week</td>
+                            <td>~300g/day provides 1,000+ calories from carbs</td>
+                        </tr>
+                        <tr>
+                            <td><div class="item-name"><div class="item-icon protein"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="4"/><path d="M4 6v6a8 4 0 0 0 16 0V6"/><path d="M4 12v6a8 4 0 0 0 16 0v-6"/></svg></div><div class="item-details"><div class="item-title">Canned Protein</div><div class="item-desc">Beans, tuna, chicken</div></div></div></td>
+                            <td><span class="calc-basis">3-4 cans</span> per person/week</td>
+                            <td>USDA: ~50g protein/day for adults</td>
+                        </tr>
+                        <tr>
+                            <td><div class="item-name"><div class="item-icon vegetable"><svg viewBox="0 0 24 24"><path d="M12 2a9 9 0 0 0-9 9c0 3 2 6 4 8l5 3 5-3c2-2 4-5 4-8a9 9 0 0 0-9-9z"/></svg></div><div class="item-details"><div class="item-title">Canned Vegetables</div><div class="item-desc">Mixed veggies, beans, corn</div></div></div></td>
+                            <td><span class="calc-basis">4-5 cans</span> per person/week</td>
+                            <td>2-3 servings/day for vitamins & fiber</td>
+                        </tr>
+                        <tr>
+                            <td><div class="item-name"><div class="item-icon medical"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="item-details"><div class="item-title">First Aid Kit</div><div class="item-desc">Bandages, medications</div></div></div></td>
+                            <td><span class="calc-basis">1 kit</span> per household</td>
+                            <td>Red Cross basic emergency kit standard</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Calculator -->
+        <div class="card">
+            <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>Supply Calculator</div></div>
+            <div class="card-body">
+                <div class="source-citation">
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--color-primary);fill:none;stroke-width:2;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    Calculations based on FEMA 3-day minimum guidelines × your duration
+                </div>
+                <div class="calculator-form">
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Number of People</label><input type="number" class="form-input" id="num-people" placeholder="4" min="1" value="4"></div>
+                        <div class="form-group"><label class="form-label">Duration (days)</label><input type="number" class="form-input" id="num-days" placeholder="14" min="1" value="14"></div>
+                    </div>
+                    <button class="calculate-btn" onclick="calculateRations()"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Calculate Supplies Needed</button>
+                    <div class="result-box" id="result-box">
+                        <div class="result-title">Estimated Supplies for <span id="result-summary"></span></div>
+                        <div class="result-grid" id="result-grid"></div>
+                        <div class="result-note">Based on FEMA Ready.gov guidelines. Actual needs vary by age, health, climate, and activity. Always prepare more than minimum.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Crops -->
+        <div class="card full-width">
+            <div class="card-header">
+                <div class="card-title"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 12V6"/><path d="M12 12l4 2"/></svg>Quick-Grow Crops Guide</div>
+                <span style="font-size:0.75rem;color:var(--color-text-muted);">Verified growing times</span>
+            </div>
+            <div class="card-body">
+                <div class="source-citation">
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--color-primary);fill:none;stroke-width:2;flex-shrink:0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Source: <a href="https://extension.org/" target="_blank">Cooperative Extension</a> & <a href="https://www.nal.usda.gov/" target="_blank">USDA National Agricultural Library</a>
+                </div>
+                <div class="crop-grid">
+                    <div class="crop-card">
+                        <div class="crop-header">
+                            <div class="crop-icon"><svg viewBox="0 0 24 24"><path d="M12 2a9 9 0 0 0-9 9c0 3 2 6 4 8l5 3 5-3c2-2 4-5 4-8a9 9 0 0 0-9-9z"/></svg></div>
+                            <div class="crop-info"><div class="crop-name">Leaf Lettuce</div><div class="crop-time"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>30-45 days</div></div>
+                        </div>
+                        <div class="crop-details">Cut-and-come-again harvesting. Tolerates partial shade. Plant every 2 weeks for ongoing supply.</div>
+                        <div class="crop-tags"><span class="crop-tag">Beginner</span><span class="crop-tag">Container OK</span><span class="crop-tag">Partial Shade</span></div>
+                    </div>
+                    <div class="crop-card">
+                        <div class="crop-header">
+                            <div class="crop-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 2v4"/><path d="M12 18v4"/></svg></div>
+                            <div class="crop-info"><div class="crop-name">Radishes</div><div class="crop-time"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>25-30 days</div></div>
+                        </div>
+                        <div class="crop-details">Fastest maturing vegetable. Direct sow ½ inch deep. Spring/fall crops best. Greens are edible too.</div>
+                        <div class="crop-tags"><span class="crop-tag">Fastest</span><span class="crop-tag">Direct Sow</span><span class="crop-tag">Cool Weather</span></div>
+                    </div>
+                    <div class="crop-card">
+                        <div class="crop-header">
+                            <div class="crop-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="3" ry="8"/><path d="M12 4c-4 0-8 3-8 8s4 8 8 8"/></svg></div>
+                            <div class="crop-info"><div class="crop-name">Bush Beans</div><div class="crop-time"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>50-60 days</div></div>
+                        </div>
+                        <div class="crop-details">High protein yield per sq ft. Fixes nitrogen in soil. Harvest every 2-3 days for continuous production.</div>
+                        <div class="crop-tags"><span class="crop-tag">High Protein</span><span class="crop-tag">Improves Soil</span><span class="crop-tag">No Staking</span></div>
+                    </div>
+                    <div class="crop-card">
+                        <div class="crop-header">
+                            <div class="crop-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="14" rx="8" ry="6"/><path d="M8 14c0-2 1.8-4 4-4s4 2 4 4"/></svg></div>
+                            <div class="crop-info"><div class="crop-name">Potatoes</div><div class="crop-time"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>70-90 days</div></div>
+                        </div>
+                        <div class="crop-details">Highest calorie yield per area. Grow in containers/bags/ground. Store months in cool, dark place.</div>
+                        <div class="crop-tags"><span class="crop-tag">Highest Calories</span><span class="crop-tag">Long Storage</span><span class="crop-tag">Grow in Bags</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Resources -->
+        <div class="card full-width">
+            <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Official Resources & Assistance</div></div>
+            <div class="card-body">
+                <div class="resource-grid">
+                    <a href="https://www.ready.gov/kit" target="_blank" class="resource-link">
+                        <div class="resource-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+                        <div class="resource-info"><div class="resource-title">FEMA Ready.gov</div><div class="resource-desc">Official emergency supply checklist</div></div>
+                        <svg class="resource-arrow" viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                    <a href="https://www.feedingamerica.org/find-your-local-foodbank" target="_blank" class="resource-link">
+                        <div class="resource-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+                        <div class="resource-info"><div class="resource-title">Find Food Banks</div><div class="resource-desc">Feeding America locator</div></div>
+                        <svg class="resource-arrow" viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                    <a href="https://www.fns.usda.gov/snap/state-directory" target="_blank" class="resource-link">
+                        <div class="resource-icon"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15h0M2 9h20"/></svg></div>
+                        <div class="resource-info"><div class="resource-title">SNAP Benefits</div><div class="resource-desc">Apply for food assistance</div></div>
+                        <svg class="resource-arrow" viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                    <a href="https://www.211.org/" target="_blank" class="resource-link">
+                        <div class="resource-icon"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.574 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
+                        <div class="resource-info"><div class="resource-title">211 Helpline</div><div class="resource-desc">Community meals & local help</div></div>
+                        <svg class="resource-arrow" viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                    <a href="https://www.redcross.org/get-help/how-to-prepare-for-emergencies.html" target="_blank" class="resource-link">
+                        <div class="resource-icon"><svg viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></div>
+                        <div class="resource-info"><div class="resource-title">Red Cross</div><div class="resource-desc">Emergency preparedness guides</div></div>
+                        <svg class="resource-arrow" viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                    <a href="https://www.foodsafety.gov/food-safety-charts/cold-food-storage-charts" target="_blank" class="resource-link">
+                        <div class="resource-icon"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg></div>
+                        <div class="resource-info"><div class="resource-title">FoodSafety.gov</div><div class="resource-desc">Food storage safety charts</div></div>
+                        <svg class="resource-arrow" viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        if (localStorage.getItem('isLoggedIn') !== 'true') window.location.href = 'index.html';
+        if (localStorage.getItem('userRole') !== 'admin') window.location.href = 'citizen_shield.html';
+        
+        function logout() { localStorage.clear(); window.location.href = 'index.html'; }
+        
+        function calculateRations() {
+            const people = parseInt(document.getElementById('num-people').value) || 1;
+            const days = parseInt(document.getElementById('num-days').value) || 1;
+            
+            const water = people * days * 1;
+            const grains = Math.ceil(people * (days / 7) * 2);
+            const proteinCans = Math.ceil(people * (days / 7) * 4);
+            const vegCans = Math.ceil(people * (days / 7) * 5);
+            
+            document.getElementById('result-summary').textContent = `${people} people × ${days} days`;
+            document.getElementById('result-grid').innerHTML = `
+                <div class="result-item"><div class="result-icon" style="background:rgba(100,180,255,0.15);"><svg viewBox="0 0 24 24" style="stroke:#64B4FF;"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg></div><div><div class="result-value">${water} gal</div><div class="result-label">Water</div></div></div>
+                <div class="result-item"><div class="result-icon" style="background:rgba(255,180,100,0.15);"><svg viewBox="0 0 24 24" style="stroke:#FFB464;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div><div><div class="result-value">${grains} lbs</div><div class="result-label">Grains</div></div></div>
+                <div class="result-item"><div class="result-icon" style="background:rgba(200,150,100,0.15);"><svg viewBox="0 0 24 24" style="stroke:#C89664;"><ellipse cx="12" cy="6" rx="8" ry="4"/><path d="M4 6v6a8 4 0 0 0 16 0V6"/></svg></div><div><div class="result-value">${proteinCans} cans</div><div class="result-label">Protein</div></div></div>
+                <div class="result-item"><div class="result-icon" style="background:rgba(100,200,130,0.15);"><svg viewBox="0 0 24 24" style="stroke:#64C882;"><path d="M12 2a9 9 0 0 0-9 9c0 3 2 6 4 8l5 3 5-3c2-2 4-5 4-8a9 9 0 0 0-9-9z"/></svg></div><div><div class="result-value">${vegCans} cans</div><div class="result-label">Vegetables</div></div></div>
+            `;
+            document.getElementById('result-box').classList.add('visible');
+        }
+    </script>
+</body>
+</html>

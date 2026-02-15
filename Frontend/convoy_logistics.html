@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convoy - Civilization Shield</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --color-surface: rgba(15, 28, 50, 0.92);
+            --color-border: rgba(255, 255, 255, 0.1);
+            --color-text: #E8F0F8;
+            --color-text-muted: #8AA0B8;
+            --color-primary: #00AAFF;
+            --color-success: #00D68F;
+            --color-warning: #FFAA00;
+            --color-danger: #FF4D4D;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--color-text);
+            min-height: 100vh;
+            /* VISIBLE MOUNTAIN BACKGROUND */
+            background-image: url('background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(5, 12, 25, 0.80);
+            z-index: 0;
+        }
+        
+        .header {
+            background: var(--color-surface);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0 1.5rem;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 0.75rem; font-size: 1rem; font-weight: 700; color: var(--color-text); text-decoration: none; }
+        .logo svg { width: 24px; height: 24px; fill: var(--color-primary); }
+        
+        .header-nav { display: flex; gap: 0.25rem; }
+        .nav-item { color: var(--color-text-muted); text-decoration: none; font-size: 0.8rem; font-weight: 500; padding: 0.4rem 0.75rem; border-radius: 4px; display: flex; align-items: center; gap: 0.4rem; }
+        .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .nav-item:hover { color: var(--color-text); background: rgba(0,0,0,0.05); }
+        .nav-item.active { color: var(--color-primary); background: rgba(0, 102, 255, 0.1); }
+        
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .status-indicators { display: flex; gap: 1rem; }
+        .status-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--color-text-muted); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-dot.green { background: var(--color-success); }
+        .status-dot.red { background: var(--color-danger); }
+        
+        .logout-btn { padding: 0.4rem 0.75rem; background: transparent; border: 1px solid var(--color-border); border-radius: 4px; font-size: 0.75rem; color: var(--color-text-muted); cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 0.3rem; }
+        .logout-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .logout-btn:hover { background: var(--color-danger); border-color: var(--color-danger); color: white; }
+        
+        .main-container { display: grid; grid-template-columns: 1fr 1fr 320px; gap: 1rem; padding: 1rem; height: calc(100vh - 56px); position: relative; z-index: 1; }
+        
+        .panel {
+            background: var(--color-surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-header { padding: 0.875rem 1rem; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
+        .panel-title { font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
+        .panel-title svg { width: 16px; height: 16px; stroke: var(--color-primary); fill: none; stroke-width: 2; }
+        
+        .view-toggle { display: flex; gap: 0.25rem; background: rgba(0, 20, 40, 0.5); padding: 0.25rem; border-radius: 6px; }
+        .view-btn { padding: 0.4rem 0.7rem; background: transparent; border: none; border-radius: 4px; font-size: 0.7rem; font-weight: 600; color: var(--color-text-muted); cursor: pointer; font-family: inherit; transition: all 0.2s; }
+        .view-btn:hover { color: #FFFFFF; background: rgba(0, 170, 255, 0.2); }
+        .view-btn.active { background: var(--color-primary); color: white; box-shadow: 0 2px 8px rgba(0, 170, 255, 0.4); }
+        
+        .map-container { flex: 1; }
+        #traffic-map, #routes-map { height: 100%; width: 100%; }
+        
+        .optimization-badge { position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); padding: 0.5rem 1rem; background: var(--color-success); color: white; font-size: 0.7rem; font-weight: 600; border-radius: 20px; z-index: 500; }
+        
+        .assets-list { flex: 1; overflow-y: auto; padding: 0.75rem; }
+        
+        .asset-card { 
+            background: rgba(8, 18, 35, 0.98); 
+            border: 1px solid rgba(255, 255, 255, 0.15); 
+            border-radius: 8px; 
+            padding: 0.875rem; 
+            margin-bottom: 0.75rem; 
+            cursor: pointer; 
+            transition: all 0.15s; 
+        }
+        .asset-card:hover { transform: translateX(-3px); box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+        .asset-card.linked { border-color: #00AAFF; background: rgba(0, 80, 160, 0.4); }
+        .asset-card.warning { border-color: #FFAA00; background: rgba(180, 100, 0, 0.35); }
+        
+        .asset-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .asset-name { font-size: 0.85rem; font-weight: 600; color: #FFFFFF; }
+        .asset-status { font-size: 0.6rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 3px; text-transform: uppercase; }
+        .asset-status.active { background: rgba(0, 214, 143, 0.25); color: #00D68F; border: 1px solid rgba(0, 214, 143, 0.4); }
+        .asset-status.idle { background: rgba(138, 160, 184, 0.2); color: #A0B8D0; border: 1px solid rgba(138, 160, 184, 0.3); }
+        .asset-status.blocked { background: rgba(255, 77, 77, 0.25); color: #FF6B6B; border: 1px solid rgba(255, 77, 77, 0.4); }
+        
+        .asset-details { font-size: 0.75rem; color: #A0B8D0; }
+        .detail-row { display: flex; justify-content: space-between; margin-bottom: 0.4rem; }
+        .detail-value { font-family: 'JetBrains Mono', monospace; color: #FFFFFF; font-weight: 500; }
+        
+        .task-force { margin-top: 0.75rem; padding: 0.6rem; background: rgba(0, 170, 255, 0.12); border-left: 2px solid #00AAFF; border-radius: 4px; }
+        .task-force-title { font-size: 0.65rem; font-weight: 700; color: #00CCFF; text-transform: uppercase; margin-bottom: 0.2rem; }
+        .task-force-desc { font-size: 0.7rem; color: #80C0E0; }
+        
+        .ai-alert { margin-top: 0.75rem; padding: 0.6rem; background: rgba(255, 170, 0, 0.12); border-left: 2px solid #FFAA00; border-radius: 4px; }
+        .ai-alert-title { font-size: 0.65rem; font-weight: 700; color: #FFCC00; text-transform: uppercase; margin-bottom: 0.2rem; }
+        .ai-alert-desc { font-size: 0.7rem; color: #E0C080; }
+        
+        @media (max-width: 1200px) { .main-container { grid-template-columns: 1fr 1fr; } .panel:last-child { grid-column: 1 / -1; max-height: 300px; } }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="overwatch_dashboard.html" class="logo">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Civilization Shield
+            </a>
+            <nav class="header-nav">
+                <a href="overwatch_dashboard.html" class="nav-item"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a>
+                <a href="convoy_logistics.html" class="nav-item active"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Logistics</a>
+                <a href="supply_management.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Supplies</a>
+            </nav>
+            <div class="header-right">
+                <div class="status-indicators">
+                    <div class="status-item"><div class="status-dot green"></div>GPS Online</div>
+                    <div class="status-item"><div class="status-dot green"></div>12 Active</div>
+                    <div class="status-item"><div class="status-dot red"></div>3 Blocked</div>
+                </div>
+                <button class="logout-btn" onclick="logout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button>
+            </div>
+        </div>
+    </header>
+    
+    <div class="main-container">
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Traffic & Blockages</div>
+                <div class="view-toggle"><button class="view-btn active">Live</button><button class="view-btn">Forecast</button></div>
+            </div>
+            <div class="map-container"><div id="traffic-map"></div></div>
+        </div>
+        
+        <div class="panel" style="position:relative">
+            <div class="panel-header">
+                <div class="panel-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>Route Planning</div>
+                <div class="view-toggle"><button class="view-btn active">Optimal</button><button class="view-btn">Fastest</button><button class="view-btn">Safest</button></div>
+            </div>
+            <div class="map-container"><div id="routes-map"></div></div>
+            <div class="optimization-badge">Route Optimized • Demo Data</div>
+        </div>
+        
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Active Assets</div>
+                <span style="font-size:0.7rem;color:var(--color-success);font-weight:600">12 Online</span>
+            </div>
+            <div class="assets-list">
+                <div class="asset-card linked">
+                    <div class="asset-header"><div class="asset-name">Ambulance 402</div><div class="asset-status active">En Route</div></div>
+                    <div class="asset-details">
+                        <div class="detail-row"><span>Status</span><span class="detail-value">Demo Vehicle</span></div>
+                        <div class="detail-row"><span>Destination</span><span class="detail-value">General Hospital</span></div>
+                    </div>
+                    <div class="task-force"><div class="task-force-title">Task Force Alpha</div><div class="task-force-desc">Paired with Bulldozer 203</div></div>
+                </div>
+                <div class="asset-card linked">
+                    <div class="asset-header"><div class="asset-name">Bulldozer 203</div><div class="asset-status active">En Route</div></div>
+                    <div class="asset-details">
+                        <div class="detail-row"><span>Task</span><span class="detail-value">Demo Task</span></div>
+                        <div class="detail-row"><span>Status</span><span class="detail-value">Active</span></div>
+                    </div>
+                </div>
+                <div class="asset-card">
+                    <div class="asset-header"><div class="asset-name">Food Truck 18</div><div class="asset-status idle">Idle</div></div>
+                    <div class="asset-details">
+                        <div class="detail-row"><span>Location</span><span class="detail-value">Warehouse</span></div>
+                        <div class="detail-row"><span>Status</span><span class="detail-value">Standby</span></div>
+                    </div>
+                </div>
+                <div class="asset-card">
+                    <div class="asset-header"><div class="asset-name">Ambulance 507</div><div class="asset-status blocked">Delayed</div></div>
+                    <div class="asset-details">
+                        <div class="detail-row"><span>Issue</span><span class="detail-value">Traffic</span></div>
+                        <div class="detail-row"><span>Status</span><span class="detail-value">Waiting</span></div>
+                    </div>
+                </div>
+                <div class="asset-card warning">
+                    <div class="asset-header"><div class="asset-name">Bulldozer 145</div><div class="asset-status active">En Route</div></div>
+                    <div class="ai-alert"><div class="ai-alert-title">Maintenance Scheduled</div><div class="ai-alert-desc">Routine service due. Returning to depot after current task.</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        if (localStorage.getItem('isLoggedIn') !== 'true') window.location.href = 'index.html';
+        if (localStorage.getItem('userRole') !== 'admin') window.location.href = 'citizen_shield.html';
+        function logout() { localStorage.clear(); window.location.href = 'index.html'; }
+        
+        // Maps
+        const trafficMap = L.map('traffic-map').setView([42.4668, -71.2299], 13);
+        const routesMap = L.map('routes-map').setView([42.4668, -71.2299], 13);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '©OSM' }).addTo(trafficMap);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '©OSM' }).addTo(routesMap);
+        
+        function icon(c, l) { return L.divIcon({ html: `<div style="background:${c};width:26px;height:26px;border-radius:6px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:10px">${l}</div>`, iconSize: [26,26], iconAnchor: [13,13] }); }
+        
+        // Traffic map markers
+        const trafficMarkers = {
+            live: [
+                { pos: [42.4808, -71.2102], icon: icon('#0066FF', 'H'), popup: '<b>Hospital</b>' },
+                { pos: [42.4588, -71.2199], icon: icon('#DE350B', '!'), popup: '<b>Traffic Blocked</b><br>Accident reported' },
+                { pos: [42.4628, -71.2149], icon: icon('#00875A', 'A'), popup: '<b>Ambulance 402</b><br>En route' }
+            ],
+            forecast: [
+                { pos: [42.4808, -71.2102], icon: icon('#0066FF', 'H'), popup: '<b>Hospital</b>' },
+                { pos: [42.4700, -71.2250], icon: icon('#FFAA00', '⚠'), popup: '<b>Predicted Congestion</b><br>5-6 PM rush hour' },
+                { pos: [42.4550, -71.2100], icon: icon('#FFAA00', '⚠'), popup: '<b>Predicted Slowdown</b><br>School zone 3-4 PM' }
+            ]
+        };
+        
+        // Route options
+        const routeOptions = {
+            optimal: { 
+                color: '#00875A', 
+                path: [[42.4628, -71.2149], [42.4678, -71.2149], [42.4728, -71.2102], [42.4808, -71.2102]],
+                badge: 'Optimal Route • Balanced'
+            },
+            fastest: { 
+                color: '#0066FF', 
+                path: [[42.4628, -71.2149], [42.4680, -71.2080], [42.4750, -71.2060], [42.4808, -71.2102]],
+                badge: 'Fastest Route • 12 min'
+            },
+            safest: { 
+                color: '#FFAA00', 
+                path: [[42.4628, -71.2149], [42.4628, -71.2250], [42.4750, -71.2250], [42.4808, -71.2180], [42.4808, -71.2102]],
+                badge: 'Safest Route • Avoids traffic'
+            }
+        };
+        
+        let currentTrafficMarkers = [];
+        let currentRoute = null;
+        
+        function showTrafficView(view) {
+            // Clear existing markers
+            currentTrafficMarkers.forEach(m => trafficMap.removeLayer(m));
+            currentTrafficMarkers = [];
+            
+            // Add new markers
+            trafficMarkers[view].forEach(m => {
+                const marker = L.marker(m.pos, { icon: m.icon }).bindPopup(m.popup).addTo(trafficMap);
+                currentTrafficMarkers.push(marker);
+            });
+        }
+        
+        function showRoute(type) {
+            // Clear existing route
+            if (currentRoute) routesMap.removeLayer(currentRoute);
+            
+            // Add new route
+            const opt = routeOptions[type];
+            currentRoute = L.polyline(opt.path, { color: opt.color, weight: 5, opacity: 0.8 }).addTo(routesMap);
+            
+            // Update badge
+            document.querySelector('.optimization-badge').textContent = opt.badge;
+        }
+        
+        // Initialize
+        L.marker([42.4808, -71.2102], {icon: icon('#0066FF', 'H')}).bindPopup('<b>Hospital</b>').addTo(routesMap);
+        L.marker([42.4628, -71.2149], {icon: icon('#00875A', 'A')}).bindPopup('<b>Ambulance 402</b>').addTo(routesMap);
+        showTrafficView('live');
+        showRoute('optimal');
+        
+        // Toggle button handlers
+        document.querySelectorAll('.view-toggle').forEach(toggle => {
+            toggle.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Update active state
+                    this.parentElement.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Get the toggle type and selected option
+                    const text = this.textContent.toLowerCase();
+                    
+                    // Traffic view toggle
+                    if (text === 'live' || text === 'forecast') {
+                        showTrafficView(text);
+                    }
+                    
+                    // Route toggle
+                    if (text === 'optimal' || text === 'fastest' || text === 'safest') {
+                        showRoute(text);
+                    }
+                });
+            });
+        });
+        
+        // Asset card hover effect
+        document.querySelectorAll('.asset-card.linked').forEach(c => {
+            c.addEventListener('mouseenter', () => document.querySelectorAll('.asset-card.linked').forEach(x => x.style.boxShadow = '0 0 0 2px var(--color-primary)'));
+            c.addEventListener('mouseleave', () => document.querySelectorAll('.asset-card.linked').forEach(x => x.style.boxShadow = ''));
+        });
+        
+        // Toggle button functionality
+        document.querySelectorAll('.view-toggle').forEach(toggle => {
+            toggle.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Remove active from siblings
+                    this.parentElement.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                    // Add active to clicked
+                    this.classList.add('active');
+                    
+                    // Show feedback
+                    const mode = this.textContent.trim();
+                    console.log('Switched to:', mode);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

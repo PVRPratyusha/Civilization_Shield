@@ -1,0 +1,1 @@
+"""Civilization Shield Django Project"""
